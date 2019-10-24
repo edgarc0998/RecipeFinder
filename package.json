@@ -1,7 +1,7 @@
 {
-  "name": "githubDB",
+  "name": "recipeFinder",
   "version": "2.0.0",
-  "description": "Github dashboard for coding challenge",
+  "description": "Recipe finder for saving money and food",
   "engines": {
     "node": ">= 7.0.0"
   },
