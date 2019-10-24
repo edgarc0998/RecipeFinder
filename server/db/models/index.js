@@ -1,7 +1,7 @@
-const User = require('./user')
-const Vote = require('./vote')
+var Recipe = require('./recipe')
+var User = require('./user')
 
-module.exports = {
-  User,
-  Vote
-}
+User.hasMany(Recipe)
+Recipe.belongsTo(User)
+
+module.exports = {Recipe, User}

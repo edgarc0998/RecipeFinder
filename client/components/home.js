@@ -1,236 +1,195 @@
 import React from 'react'
+import RecipeCard from './recipeCard'
 import axios from 'axios'
-import {Input} from 'semantic-ui-react'
-import {VictoryBar, VictoryChart, VictoryAxis} from 'victory'
-import FrameworkCard from './frameworkCard'
-import ChartCard from './chartCard'
+import InfiniteScroll from 'react-infinite-scroll-component'
+import Button from 'react-bootstrap/Button'
 
-export default class Home extends React.Component {
+class Home extends React.Component {
   constructor() {
     super()
+
     this.state = {
-      react: {},
-      vue: {},
-      ember: {},
-      angular: {},
-      email: '',
-      allVotes: {
-        reactVotes: 0,
-        vueVotes: 0,
-        angularVotes: 0,
-        emberVotes: 0,
-        sidVoted: false
-      },
-      emailVoted: false
+      currentSearch: '',
+      searchString: [],
+      results: {},
+      hasMore: false,
+      offset: 10
     }
-    this.submitVote = this.submitVote.bind(this)
-    this.getData = this.getData.bind(this)
+
+    this.findRecipes = this.findRecipes.bind(this)
+    this.removeFromSearch = this.removeFromSearch.bind(this)
+    this.saveRecipe = this.saveRecipe.bind(this)
   }
 
-  async submitVote(framework, email) {
+  async saveRecipe(recipe) {
     try {
-      var newVote = await axios.post(`/api/vote/${framework}/${email}`)
+      await axios.post('/api/savedRecipes/', recipe)
     } catch (err) {
       console.error(err)
     }
-
-    if (newVote.data === 'error') {
-      this.setState({
-        emailVoted: true
-      })
-    }
-
-    this.getData()
   }
 
-  async getData() {
-    var react
-    var angular
-    var vue
-    var ember
-    var allVotes
-    try {
-      react = await axios.get('https://api.github.com/repos/facebook/react', {
-        auth: {
-          username: null,
-          password: '23e8b418b3884c316a7f84d98554f830ea8a1243'
-        }
-      })
-    } catch (err) {
-      console.error(err)
+  async findRecipes(offset = 0, loadMore) {
+    var newStr = ''
+    if (
+      this.state.searchString.length > 0 &&
+      this.state.currentSearch.length > 0
+    ) {
+      newStr =
+        this.state.searchString.join(',') + ',' + this.state.currentSearch
+    } else if (
+      this.state.currentSearch === '' &&
+      this.state.searchString.length > 0
+    ) {
+      newStr = this.state.searchString.join(',')
+    } else {
+      newStr = this.state.currentSearch
     }
 
-    try {
-      angular = await axios.get(
-        'https://api.github.com/repos/angular/angular.js',
-        {
-          auth: {
-            username: null,
-            password: '23e8b418b3884c316a7f84d98554f830ea8a1243'
+    if (newStr.length > 0) {
+      try {
+        var results = await axios({
+          method: 'GET',
+          url:
+            'https://api.spoonacular.com/recipes/findByIngredients?apiKey=247d11839b7b4caa95dce7ed75300c2f',
+          params: {
+            number: 10,
+            ingredients: newStr,
+            offset: offset
           }
-        }
-      )
-    } catch (err) {
-      console.error(err)
-    }
-    try {
-      ember = await axios.get('https://api.github.com/repos/emberjs/ember.js', {
-        auth: {
-          username: null,
-          password: '23e8b418b3884c316a7f84d98554f830ea8a1243'
-        }
-      })
-    } catch (err) {
-      console.error(err)
-    }
-    try {
-      vue = await axios.get('https://api.github.com/repos/vuejs/vue', {
-        auth: {
-          username: null,
-          password: '23e8b418b3884c316a7f84d98554f830ea8a1243'
-        }
-      })
-    } catch (err) {
-      console.error(err)
-    }
-    try {
-      allVotes = await axios.get('/api/vote')
-    } catch (err) {
-      console.error(err)
-    }
+        })
+      } catch (err) {
+        console.error(err)
+      }
 
-    this.setState({
-      react: react.data,
-      angular: angular.data,
-      vue: vue.data,
-      ember: ember.data,
-      allVotes: allVotes.data
-    })
+      var newState = {}
+      if (loadMore) {
+        newState.results = this.state.results.concat(results.data)
+      } else {
+        newState.results = results.data
+      }
+      newState.currentSearch = ''
+      if (this.state.currentSearch !== '') {
+        newState.searchString = [
+          ...this.state.searchString,
+          this.state.currentSearch
+        ]
+      }
+      this.setState(newState)
+    } else {
+      this.setState({results: {}})
+    }
   }
 
-  componentDidMount() {
-    setInterval(() => {
-      this.getData()
+  fetchMoreData = () => {
+    setTimeout(() => {
+      this.findRecipes(this.state.offset + 5, true)
+      this.setState({offset: this.state.offset + 5})
     }, 1000)
   }
 
+  async removeFromSearch(word) {
+    var newSearch = [...this.state.searchString]
+    newSearch = newSearch.filter(elem => {
+      if (elem !== word) {
+        return elem
+      }
+
+    })
+
+    var newState = {}
+    newState.searchString = newSearch
+
+    if (newSearch.length === 0) {
+      newState.results = {}
+    }
+
+    await this.setState(newState)
+    this.findRecipes()
+  }
+
   render() {
+    var recipes = []
+    if (this.state.results.length > 0) {
+      recipes = this.state.results
+    }
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          alignContent: 'center',
-          height: '100%',
-          flex: 1
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            width: '100%',
-            justifyContent: 'space-evenly',
-            flexDirection: 'row',
-            alignItems: 'center',
-            alignContent: 'center',
-            height: '100%',
-            marginBottom: 30
-          }}
-        >
-          <ChartCard
-            title="Stars"
-            data={[
-              {x: 1, y: this.state.react.stargazers_count},
-              {x: 2, y: this.state.angular.stargazers_count},
-              {x: 3, y: this.state.vue.stargazers_count},
-              {x: 4, y: this.state.ember.stargazers_count}
-            ]}
-          />
-          <ChartCard
-            title="Forks"
-            data={[
-              {x: 1, y: this.state.react.forks},
-              {x: 2, y: this.state.angular.forks},
-              {x: 3, y: this.state.vue.forks},
-              {x: 4, y: this.state.ember.forks}
-            ]}
-          />
-          <ChartCard
-            title="Open Issues"
-            data={[
-              {x: 1, y: this.state.react.open_issues},
-              {x: 2, y: this.state.angular.open_issues},
-              {x: 3, y: this.state.vue.open_issues},
-              {x: 4, y: this.state.ember.open_issues}
-            ]}
-          />
+      <div id="home">
+        <div id="sideMenu">
+          <div id="currentIngredientsLabel">Your Ingredients</div>
+          <div id="search">
+            <input
+              id="searchInput"
+              value={this.state.currentSearch}
+              onChange={() =>
+                this.setState({
+                  currentSearch: document.getElementById('searchInput').value
+                })
+              }
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => this.findRecipes()}
+            >
+              Add
+            </Button>
+          </div>
+
+          <div id="currentIngredients">
+            {this.state.searchString.length < 1
+              ? null
+              : this.state.searchString.map((word, idx) => {
+                  return (
+                    <div
+                      id="searchString"
+                      key={idx}
+                      onClick={() => this.removeFromSearch(word)}
+                    >
+                      <h4>{word}</h4>
+                    </div>
+                  )
+                })}
+          </div>
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'row',
-            width: '100%',
-            justifyContent: 'space-evenly'
-          }}
-        >
-          <FrameworkCard
-            framework="React"
-            email={this.state.email}
-            submitVote={this.submitVote}
-            votes={this.state.allVotes.reactVotes}
-            color="crimson"
-          />
-          <FrameworkCard
-            framework="Angular"
-            email={this.state.email}
-            submitVote={this.submitVote}
-            votes={this.state.allVotes.angularVotes}
-            color="navy"
-          />
-          <FrameworkCard
-            framework="Vue"
-            email={this.state.email}
-            submitVote={this.submitVote}
-            votes={this.state.allVotes.vueVotes}
-            color="limegreen"
-          />
-          <FrameworkCard
-            framework="Ember"
-            email={this.state.email}
-            submitVote={this.submitVote}
-            votes={this.state.allVotes.emberVotes}
-            color="orange"
-          />
-        </div>
-
-        <div style={{marginTop: 30}}>
-          {this.state.allVotes.sidVoted ? (
-            <div style={{color: 'crimson'}}>
-              You already voted on this computer
-            </div>
-          ) : this.state.emailVoted ? (
-            <div style={{color: 'crimson'}}>
-              You already voted with that email
+        <div id="sideContent">
+          {!this.state.results.length ? (
+            <div id="instructions">
+              <h1>
+                Search for recipes by typing in ingredients you currently have!
+              </h1>
             </div>
           ) : (
-            <div>Enter your email to vote</div>
+            <InfiniteScroll
+              dataLength={this.state.results.length}
+              next={this.fetchMoreData}
+              hasMore={this.state.hasMore}
+              loader={<h1>Loading</h1>}
+              endMessage={
+                <p style={{textAlign: 'center'}}>
+                  <b>Yay! You have seen it all</b>
+                </p>
+              }
+            >
+              <div id="results">
+                {recipes.map((elem, idx) => {
+                  return (
+                    <RecipeCard
+                      elem={elem}
+                      saveRecipe={this.saveRecipe}
+                      key={idx}
+                      signedIn={!!this.props.user.id}
+                    />
+                  )
+                })}
+              </div>
+            </InfiniteScroll>
           )}
-
-          <br />
-          <Input
-            id="emailInput"
-            value={this.state.email}
-            onChange={() => {
-              this.setState({
-                email: document.getElementById('emailInput').value
-              })
-            }}
-            disabled={!!this.state.allVotes.sidVoted}
-          />
         </div>
       </div>
     )
   }
 }
+
+export default Home
